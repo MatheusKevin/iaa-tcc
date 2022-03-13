@@ -1,9 +1,11 @@
 import os
+import pickle
 import numpy as np
 import pandas as pd
 import random as rd
 
 from tqdm import tqdm
+from sklearn import svm, metrics
 from sklearn.model_selection import train_test_split
 
 DATA_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\teste"
@@ -36,3 +38,14 @@ x_data = np.array(x_data)
 y_data = np.array(y_data)
 
 x_train, x_test, y_train, y_test = train_test_split(x_data,y_data,test_size=.4, random_state=42, stratify=y_data)
+
+clf = svm.SVC(kernel='linear')
+clf.fit(x_train, y_train)
+y_pred = clf.predict(x_test)
+
+print("Acurácia:",metrics.accuracy_score(y_test, y_pred))
+
+# Save the trained model as a pickle string.
+# saved_model = pickle.dumps(knn)
+# Load the pickled model
+# knn_from_pickle = pickle.loads(saved_model)
