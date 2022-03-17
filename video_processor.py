@@ -8,16 +8,22 @@ import gc
 import os
 
 FILE = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel.chunks_90.csv"
-DATASET_PATH = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\datasets\\drive_and_act\\kinect_color"
+DATASET_PATH = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\drive_and_act\\kinect_color"
 DEST_PATH = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel"
 
-def get_anotations_per_video(video_name, anotations) -> list:
-    temp = anotations[anotations['file_id'] == video_name]
-    lista = []
-    for row in temp.iterrows():
-        # file, activity, start , end , anotation _id , chunk_id
-        lista.append((row[1][1], row[1][5], row[1][3], row[1][4], row[1][2], row[1][6]))
-    return lista
+treino = [1, 10]
+teste = [11, 12]
+validacao = [13, 15]
+
+def obter_parte(part_id):
+    if treino[0] <= part_id <= treino[1]:
+        return 'train'
+    elif teste[0] <= part_id <= teste[1]:
+        return 'test'
+    elif validacao[0] <= part_id <= validacao[1]:
+        return 'validation'
+    else:
+        return ''
 
 # get anotations per video
 # video, anotation id, frame start, frame end, label (activity)
@@ -35,11 +41,10 @@ def get_full_length_annotations_per_video(video_name, anotations) -> list:
         # print(temp)
         # ( video_name, activity, start, end, annotation_id)
         lista.append((temp['file_id'].iat[0], temp['activity'].iat[0], temp['frame_start'].iat[0],
-                      temp['frame_end'].iat[-1], annotation_id))
+                      temp['frame_end'].iat[-1], annotation_id, temp['participant_id'].iat[0]))
     return lista
 
 anotations = pd.read_csv(FILE, sep=";")
-#vid_file = open("videos.txt", "a")
 
 for video in tqdm(anotations['file_id'].unique()):
 
@@ -52,6 +57,9 @@ for video in tqdm(anotations['file_id'].unique()):
         raise Exception("Video sem labels")
 
     cap = cv2.VideoCapture(DATASET_PATH + "\\" + video + ".mp4")
+    parte = obter_parte(label[5])
+    if not parte:
+        raise Exception('Parte não configurada')
 
     framecount = 0
     clip = []
@@ -68,12 +76,11 @@ for video in tqdm(anotations['file_id'].unique()):
             # label( video_name, activity, start, end, annotation_id)
             video = label[0].split('/')
             # path = DEST_PATH + "\\" + video[0] + f"_{video[1]}" + "_" + label[1] + "_" + f"{label[4]}.mp4"
-            if not os.path.exists(DEST_PATH + "\\" + label[1]):
-                os.makedirs(DEST_PATH + "\\" + label[1])
+            if not os.path.exists(DEST_PATH + "\\" + parte + "\\" + label[1]):
+                os.makedirs(DEST_PATH + "\\" + parte + "\\" + label[1])
 
-            path = DEST_PATH + "\\" + label[1] + "\\" + video[0] + f"_{video[1]}" + "_" + f"{label[4]}.mp4"
+            path = DEST_PATH + "\\" + parte + "\\" + label[1] + "\\" + video[0] + f"_{video[1]}" + "_" + f"{label[4]}.mp4"
             clip_to_save.write_videofile(path, verbose=False, logger=None)
-            #vid_file.write(path + "\n")
             clip = []
             if len(labels):
 
@@ -93,5 +100,3 @@ for video in tqdm(anotations['file_id'].unique()):
             clip.append(frame)
     cap.release()
     gc.collect()
-
-#vid_file.close()
