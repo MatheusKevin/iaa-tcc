@@ -18,32 +18,31 @@ feature_extractor = keras.Model(
 )
 print(feature_extractor.summary())
 
-class_names = os.listdir(DATA_DIR)
+for part in os.listdir(DATA_DIR):
+    for class_name in os.listdir(os.path.join(DATA_DIR, part)):
+        if not os.path.exists(os.path.join(DEST_DIR, part, class_name)):
+            os.makedirs(os.path.join(DEST_DIR, part, class_name))
 
-for class_name in tqdm(class_names):
-    if not os.path.exists(os.path.join(DEST_DIR, class_name)):
-        os.makedirs(os.path.join(DEST_DIR, class_name))
-
-    file_names = os.listdir(os.path.join(DATA_DIR, class_name))
-    for file in file_names:
-        x_deep = []
-        vidcap = cv2.VideoCapture(os.path.join(DATA_DIR, class_name, file))
-        success, img = vidcap.read()
-        while success:
-            img.resize((64, 64, 3))
-            xd = image.img_to_array(img)
-            xd = np.expand_dims(xd, axis=0)
-            deep_features = feature_extractor(xd)
-
-            x_image_aux = []
-            for aux in deep_features:
-                x_image_aux = np.append(x_image_aux, np.ravel(aux))
-
-            deep_features = [i for i in x_image_aux]
-            x_deep.append(deep_features)
-
+        file_names = os.listdir(os.path.join(DATA_DIR, part, class_name))
+        for file in tqdm(file_names):
+            x_deep = []
+            vidcap = cv2.VideoCapture(os.path.join(DATA_DIR, part, class_name, file))
             success, img = vidcap.read()
+            while success:
+                img.resize((64, 64, 3))
+                xd = image.img_to_array(img)
+                xd = np.expand_dims(xd, axis=0)
+                deep_features = feature_extractor(xd)
 
-        df = pd.DataFrame(x_deep)
-        df.to_csv(os.path.join(DEST_DIR, class_name, file + ".csv"), header=False, index=False)
-        vidcap.release()
+                x_image_aux = []
+                for aux in deep_features:
+                    x_image_aux = np.append(x_image_aux, np.ravel(aux))
+
+                deep_features = [i for i in x_image_aux]
+                x_deep.append(deep_features)
+
+                success, img = vidcap.read()
+
+            df = pd.DataFrame(x_deep)
+            df.to_csv(os.path.join(DEST_DIR, part, class_name, file + ".csv"), header=False, index=False)
+            vidcap.release()

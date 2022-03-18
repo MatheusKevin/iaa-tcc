@@ -1,84 +1,35 @@
 import os
-import pickle
-import numpy as np
-import pandas as pd
-import random as rd
 
 from tqdm import tqdm
-from sklearn import svm, metrics
-from sklearn.model_selection import train_test_split
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import lit
+from pyspark.ml.classification import LinearSVC
+from pyspark.ml.feature import VectorAssembler
 
-DATA_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features'
+spark = SparkSession.builder.master('local[1]').appName('tcc_iaa').getOrCreate()
+
 MODEL_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA'
-sample_by_class = 2000
+DATA_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features'
+TRAIN_DIR = os.path.join(DATA_DIR, 'train')
+TEST_DIR = os.path.join(DATA_DIR, 'test')
+VALID_DIR = os.path.join(DATA_DIR, 'validation')
 
-class_names = os.listdir(DATA_DIR)
+df = None
 
-def get_random_frame_features(frames, max_frames):
-    if max_frames > frames.shape[0]:
-        return frames.to_numpy()
+for class_num, class_name in enumerate(os.listdir(TRAIN_DIR)):
+    file_names = os.listdir(os.path.join(TRAIN_DIR, class_name))
+    for file_name in tqdm(file_names):
+        temp_df = spark.read.csv(os.path.join(TRAIN_DIR, class_name, file_name), inferSchema=True)
+        assembler = VectorAssembler(inputCols=temp_df.columns, outputCol="features")
+        temp_df = assembler.transform(temp_df).select('features')
+        temp_df = temp_df.withColumn('label', lit(class_num))
 
-    rd_frames = rd.sample(range(max_frames), max_frames)
-    return np.array(list(map(lambda frame: frames.loc[frame].values.tolist(),rd_frames)))
+        if df is None:
+            df = temp_df
+        else:
+            df = df.union(temp_df)
 
-def generate_svm_classifier():
-    class_samples = []
-    x_data = []
-    y_data = []
 
-    for class_num, class_name in enumerate(class_names):
-        file_names = os.listdir(os.path.join(DATA_DIR, class_name))
-        num_videos = len(file_names)
-        frames_by_video = sample_by_class // num_videos
-        count = 0
-
-        for file in tqdm(file_names):
-            df_video = pd.read_csv(os.path.join(DATA_DIR, class_name, file), header=None)
-            for frame_features in get_random_frame_features(df_video, frames_by_video):
-                x_data.append(frame_features)
-                y_data.append(class_num)
-                count = count + 1
-
-        class_samples.append(count)
-
-    for class_num, class_name in enumerate(class_names):
-        print(class_name + ': %d' % class_samples[class_num])
-
-    x_data = np.array(x_data)
-    y_data = np.array(y_data)
-    print(x_data.shape)
-
-    x_train, x_test, y_train, y_test = train_test_split(x_data,y_data,test_size=.4, random_state=42, stratify=y_data)
-
-    clf = svm.SVC(kernel='linear')
-    clf.fit(x_train, y_train)
-    y_pred = clf.predict(x_test)
-    print("Accuracy: ", metrics.accuracy_score(y_test, y_pred))
-
-    return clf
-
-def determine_pred_class(y):
-    return np.bincount(y).argmax()
-
-if os.path.exists(os.path.join(MODEL_DIR, 'clf.pkl')):
-    f = open(os.path.join(MODEL_DIR, 'clf.pkl'), 'rb')
-    clf = pickle.load(f)
-else:
-    f = open(os.path.join(MODEL_DIR, 'clf.pkl'), 'wb')
-    clf = generate_svm_classifier()
-    pickle.dump(clf, f)
-
-y_data = []
-y_pred = []
-
-for class_num, class_name in enumerate(class_names):
-    file_names = os.listdir(os.path.join(DATA_DIR, class_name))
-
-    for file in tqdm(file_names):
-        x_data = pd.read_csv(os.path.join(DATA_DIR, class_name, file), header=None)
-        x_data = x_data.to_numpy()
-        y_frames_pred = clf.predict(x_data)
-        y_data.append(class_num)
-        y_pred.append(determine_pred_class(y_frames_pred))
-
-print("Accuracy: ", metrics.accuracy_score(y_data, y_pred))
+print((temp_df.count(), len(temp_df.columns)))
+lsvc = LinearSVC(maxIter=10, regParam=0.1)
+lsvcModel = lsvc.fit(df)
