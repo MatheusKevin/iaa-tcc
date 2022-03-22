@@ -19,7 +19,7 @@ def get_random_frame_features(frames, max_frames):
         return frames.to_numpy()
 
     rd_frames = rd.sample(range(max_frames), max_frames)
-    return np.array(list(map(lambda frame: frames.loc[frame].values.tolist(),rd_frames)))
+    return np.array(list(map(lambda frame: frames.loc[frame].values.tolist(), rd_frames)))
 
 def generate_svm_classifier():
     class_samples = []

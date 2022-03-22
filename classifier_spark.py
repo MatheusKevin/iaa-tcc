@@ -3,7 +3,7 @@ import os
 from tqdm import tqdm
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit
-from pyspark.ml.classification import LinearSVC, OneVsRest
+from pyspark.ml.classification import LinearSVC, OneVsRest, MultilayerPerceptronClassifier
 from pyspark.ml.feature import VectorAssembler
 from pyspark.mllib.evaluation import MulticlassMetrics
 
@@ -42,13 +42,18 @@ df_test = get_dataframe(TEST_DIR)
 print((df_train.count(), len(df_train.columns)))
 print((df_test.count(), len(df_test.columns)))
 
-#lsvc = LinearSVC(maxIter=10, regParam=0.1)
-svm = LinearSVC()
-ovr = OneVsRest(classifier=svm)
-lsvcModel = ovr.fit(df_train)
-lsvcModel.save(os.path.join(MODEL_DIR, 'LsvcModel'))
+# lsvc = LinearSVC(maxIter=10, regParam=0.1)
+# svm = LinearSVC()
+# ovr = OneVsRest(classifier=svm)
+# lsvcModel = ovr.fit(df_train)
+# lsvcModel.save(os.path.join(MODEL_DIR, 'LsvcModel'))
 
-transformed = lsvcModel.transform(df_test)
+
+layers = [500, 34]
+trainer = MultilayerPerceptronClassifier(maxIter=100, layers=layers, seed=1234)
+model = trainer.fit(df_train)
+
+transformed = model.transform(df_test)
 
 # Instantiate metrics object
 metrics = MulticlassMetrics(transformed)
