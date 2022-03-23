@@ -19,7 +19,6 @@ TRAIN_DIR = os.path.join(DATA_DIR, 'train')
 TEST_DIR = os.path.join(DATA_DIR, 'test')
 VALID_DIR = os.path.join(DATA_DIR, 'validation')
 
-
 def get_dataframe(data_path):
     df = None
     for class_num, class_name in enumerate(os.listdir(data_path)):
