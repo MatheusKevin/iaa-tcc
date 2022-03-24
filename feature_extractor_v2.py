@@ -9,8 +9,8 @@ from tensorflow import keras
 from keras.preprocessing import image
 from keras.layers import Flatten
 
-DEST_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features"
-DATA_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel"
+DEST_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features_2"
+DATA_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel_2"
 TRAIN_DIR = os.path.join(DATA_DIR, 'train')
 TEST_DIR = os.path.join(DATA_DIR, 'test')
 VALID_DIR = os.path.join(DATA_DIR, 'validation')
@@ -29,12 +29,13 @@ def extract_features_in_x_y_format(data_path):
     if not os.path.exists(os.path.join(DEST_DIR, part)):
         os.makedirs(os.path.join(DEST_DIR, part))
 
-    x_file = open(os.path.join(DEST_DIR, part, 'x_deep.csv'), 'w', newline='')
+    x_file = open(os.path.join(DEST_DIR, part, 'features.csv'), 'w', newline='')
     x_writer = csv.writer(x_file)
-    y_file = open(os.path.join(DEST_DIR, part, 'y_labels.csv'), 'w', newline='')
+    y_file = open(os.path.join(DEST_DIR, part, 'labels.csv'), 'w', newline='')
     y_writer = csv.writer(y_file)
 
     class_names = [cl_name for cl_name in os.listdir(data_path) if cl_name not in exceptions]
+    pd.DataFrame(class_names).to_csv(os.path.join(DEST_DIR, part, 'class_names.csv'), header=False, index=True)
 
     for class_num, class_name in enumerate(class_names):
         file_names = os.listdir(os.path.join(data_path, class_name))
@@ -60,11 +61,12 @@ def extract_features_in_x_y_format(data_path):
 
 
 def extract_features_in_video_format(data_path):
+    part = data_path.split('\\')[-1]
     class_names = [cl_name for cl_name in os.listdir(data_path) if cl_name not in exceptions]
 
     for class_name in class_names:
-        if not os.path.exists(os.path.join(data_path, class_name)):
-            os.makedirs(os.path.join(data_path, class_name))
+        if not os.path.exists(os.path.join(DEST_DIR, part, class_name)):
+            os.makedirs(os.path.join(DEST_DIR, part, class_name))
 
         file_names = os.listdir(os.path.join(data_path, class_name))
         for file in tqdm(file_names):
@@ -86,11 +88,11 @@ def extract_features_in_video_format(data_path):
 
                 success, img = vidcap.read()
 
-            df = pd.DataFrame(x_deep)
-            df.to_csv(os.path.join(data_path, class_name, file + ".csv"), header=False, index=False)
+            file_name = '.'.join(file.split('.')[:-1]+['csv'])
+            pd.DataFrame(x_deep).to_csv(os.path.join(DEST_DIR, part, class_name, file_name), header=False, index=False)
             vidcap.release()
 
 
 extract_features_in_x_y_format(TRAIN_DIR)
 extract_features_in_x_y_format(TEST_DIR)
-extract_features_in_video_format(VALID_DIR)
+# extract_features_in_video_format(VALID_DIR)
