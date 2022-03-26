@@ -21,7 +21,7 @@ def generate_svm_classifier():
     y_train = np.ravel(y_train)
 
     print('Iniciando treinamento')
-    clf = svm.SVC(kernel='linear')
+    clf = svm.SVC(kernel='linear', verbose=True)
     clf.fit(x_train, y_train)
     del x_train
     gc.collect()
