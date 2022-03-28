@@ -10,13 +10,13 @@ from tensorflow import keras
 from keras.preprocessing import image
 from keras.layers import Flatten
 
-DEST_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features"
-DATA_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel"
+DEST_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features_2"
+DATA_DIR = "C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel_2"
 TRAIN_DIR = os.path.join(DATA_DIR, 'train')
 TEST_DIR = os.path.join(DATA_DIR, 'test')
 VALID_DIR = os.path.join(DATA_DIR, 'validation')
 class_ignore = ['closing_backpack', 'looking_back_left_shoulder', 'looking_back_right_shoulder', 'opening_backpack',
-                'standing_by_the_door', 'opening_backpack']
+                'standing_by_the_door']
 
 
 model = keras.models.load_model("modelo.h5")
@@ -48,8 +48,11 @@ def get_base_frame_metadata(data_path):
     return np.array(counter)
 
 
-def prepare_train_base(frame_limit=None):
-    part = TRAIN_DIR.split('\\')[-1]
+def extract_features_in_xy_format(data_path, frame_limit=None):
+    count_frame = get_base_frame_metadata(data_path)
+    print(count_frame)
+
+    part = data_path.split('\\')[-1]
     if not os.path.exists(os.path.join(DEST_DIR, part)):
         os.makedirs(os.path.join(DEST_DIR, part))
 
@@ -63,18 +66,16 @@ def prepare_train_base(frame_limit=None):
     y_file = open(os.path.join(DEST_DIR, part, 'labels.csv'), 'w', newline='')
     y_writer = csv.writer(y_file)
 
-    class_names = [cl_name for cl_name in os.listdir(TRAIN_DIR) if cl_name not in class_ignore]
-    pd.DataFrame(class_names).to_csv(os.path.join(DEST_DIR, part, 'class_names.csv'), header=False, index=True)
+    class_names = [cl_name for cl_name in os.listdir(data_path) if cl_name not in class_ignore]
+    pd.DataFrame(class_names).to_csv(os.path.join(DEST_DIR, part, 'class_names.csv'), header=False, index=False)
 
     for class_num, class_name in enumerate(class_names):
         step = count_frame[class_num] // frame_limit
         step_count = step
 
-        class_frames = 0
-
-        file_names = os.listdir(os.path.join(TRAIN_DIR, class_name))
+        file_names = os.listdir(os.path.join(data_path, class_name))
         for file in tqdm(file_names):
-            vidcap = cv2.VideoCapture(os.path.join(TRAIN_DIR, class_name, file))
+            vidcap = cv2.VideoCapture(os.path.join(data_path, class_name, file))
             success, img = vidcap.read()
 
             while success:
@@ -90,42 +91,6 @@ def prepare_train_base(frame_limit=None):
                     step_count = 0
                 else:
                     step_count = step_count + 1
-
-                success, img = vidcap.read()
-
-            vidcap.release()
-
-    x_file.close()
-    y_file.close()
-
-
-def prepare_test_base():
-    part = TEST_DIR.split('\\')[-1]
-    if not os.path.exists(os.path.join(DEST_DIR, part)):
-        os.makedirs(os.path.join(DEST_DIR, part))
-
-    x_file = open(os.path.join(DEST_DIR, part, 'features.csv'), 'w', newline='')
-    x_writer = csv.writer(x_file)
-    y_file = open(os.path.join(DEST_DIR, part, 'labels.csv'), 'w', newline='')
-    y_writer = csv.writer(y_file)
-
-    class_names = [cl_name for cl_name in os.listdir(TEST_DIR) if cl_name not in class_ignore]
-    pd.DataFrame(class_names).to_csv(os.path.join(DEST_DIR, part, 'class_names.csv'), header=False, index=True)
-
-    for class_num, class_name in enumerate(class_names):
-        file_names = os.listdir(os.path.join(TEST_DIR, class_name))
-        for file in tqdm(file_names):
-            vidcap = cv2.VideoCapture(os.path.join(TEST_DIR, class_name, file))
-            success, img = vidcap.read()
-
-            while success:
-                img.resize((64, 64, 3))
-                xd = image.img_to_array(img)
-                xd = np.expand_dims(xd, axis=0)
-                deep_features = feature_extractor(xd)
-
-                x_writer.writerow(np.ravel(deep_features))
-                y_writer.writerow([class_num])
 
                 success, img = vidcap.read()
 
@@ -168,12 +133,9 @@ def prepare_validation_base():
             vidcap.release()
 
 
-print('Analisando a base de vídeos')
-count_frame = get_base_frame_metadata(TRAIN_DIR)
-print(count_frame)
 print('Preparando a base de treino')
-prepare_train_base()
+extract_features_in_xy_format(TRAIN_DIR)
 print('Preparando a base de teste')
-prepare_test_base()
+extract_features_in_xy_format(TEST_DIR)
 print('Preparando a base de validação')
-prepare_validation_base()
+# prepare_validation_base()
