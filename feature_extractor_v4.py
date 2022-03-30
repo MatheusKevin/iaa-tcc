@@ -10,14 +10,14 @@ from tensorflow import keras
 from keras.preprocessing import image
 from keras.layers import Flatten
 
+DIC_PATH = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\class_dictionary.csv'
 DEST_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features'
 DATA_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\midlevel'
 TRAIN_DIR = os.path.join(DATA_DIR, 'train')
 TEST_DIR = os.path.join(DATA_DIR, 'test')
 VALID_DIR = os.path.join(DATA_DIR, 'validation')
-class_ignore = ['closing_backpack', 'looking_back_left_shoulder', 'looking_back_right_shoulder', 'opening_backpack',
-                'standing_by_the_door']
 
+df_dict = pd.read_csv(DIC_PATH, header=0, sep=";")
 
 model = keras.models.load_model("modelo.h5")
 feature_extractor = keras.Model(
@@ -28,14 +28,17 @@ print(feature_extractor.summary())
 
 
 def get_base_frame_metadata(data_path):
-    class_names = [cl_name for cl_name in os.listdir(data_path) if cl_name not in class_ignore]
     counter = []
 
-    for class_num, class_name in enumerate(class_names):
-        file_names = os.listdir(os.path.join(data_path, class_name))
+    for index, dict in df_dict.iterrows():
+        if not os.path.exists(os.path.join(data_path, dict['class_base'])):
+            counter.append(0)
+            continue
+
+        file_names = os.listdir(os.path.join(data_path, dict['class_base']))
         class_frames = 0
         for file in tqdm(file_names):
-            vidcap = cv2.VideoCapture(os.path.join(data_path, class_name, file))
+            vidcap = cv2.VideoCapture(os.path.join(data_path, dict['class_base'], file))
             success, img = vidcap.read()
             while success:
                 class_frames = class_frames + 1
@@ -63,19 +66,21 @@ def extract_features_in_xy_format(data_path, frame_limit=None):
 
     x_file = open(os.path.join(DEST_DIR, part, 'features.csv'), 'w', newline='')
     x_writer = csv.writer(x_file)
-    y_file = open(os.path.join(DEST_DIR, part, 'labels.csv'), 'w', newline='')
-    y_writer = csv.writer(y_file)
+    y_file_all = open(os.path.join(DEST_DIR, part, 'labels_all.csv'), 'w', newline='')
+    y_wrt_all = csv.writer(y_file_all)
+    y_file_grp = open(os.path.join(DEST_DIR, part, 'labels_group.csv'), 'w', newline='')
+    y_wrt_grp = csv.writer(y_file_grp)
 
-    class_names = [cl_name for cl_name in os.listdir(data_path) if cl_name not in class_ignore]
-    pd.DataFrame(class_names).to_csv(os.path.join(DEST_DIR, part, 'class_names.csv'), header=False, index=False)
+    for index, dict in df_dict.iterrows():
+        if not os.path.exists(os.path.join(data_path, dict['class_base'])):
+            continue
 
-    for class_num, class_name in enumerate(class_names):
-        step = count_frame[class_num] // frame_limit
+        file_names = os.listdir(os.path.join(data_path, dict['class_base']))
+
+        step = count_frame[index] // frame_limit
         step_count = step
-
-        file_names = os.listdir(os.path.join(data_path, class_name))
         for file in tqdm(file_names):
-            vidcap = cv2.VideoCapture(os.path.join(data_path, class_name, file))
+            vidcap = cv2.VideoCapture(os.path.join(data_path, dict['class_base'], file))
             success, img = vidcap.read()
 
             while success:
@@ -86,7 +91,8 @@ def extract_features_in_xy_format(data_path, frame_limit=None):
                     deep_features = feature_extractor(xd)
 
                     x_writer.writerow(np.ravel(deep_features))
-                    y_writer.writerow([class_num])
+                    y_wrt_all.writerow([dict['class_all_id']])
+                    y_wrt_grp.writerow([dict['class_group_id']])
 
                     step_count = 0
                 else:
@@ -97,14 +103,18 @@ def extract_features_in_xy_format(data_path, frame_limit=None):
             vidcap.release()
 
     x_file.close()
-    y_file.close()
+    y_file_all.close()
+    y_file_grp.close()
 
 
 def prepare_validation_base():
     part = VALID_DIR.split('\\')[-1]
-    class_names = [cl_name for cl_name in os.listdir(VALID_DIR) if cl_name not in class_ignore]
 
-    for class_name in class_names:
+    for index, dict in df_dict.iterrows():
+        class_name = dict['class_base']
+        if not os.path.exists(os.path.join(VALID_DIR, class_name)):
+            continue
+
         if not os.path.exists(os.path.join(DEST_DIR, part, class_name)):
             os.makedirs(os.path.join(DEST_DIR, part, class_name))
 
@@ -138,4 +148,4 @@ print('Preparando a base de treino')
 print('Preparando a base de teste')
 # extract_features_in_xy_format(TEST_DIR)
 print('Preparando a base de validação')
-# prepare_validation_base()
+prepare_validation_base()

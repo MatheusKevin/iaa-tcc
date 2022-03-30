@@ -10,6 +10,7 @@ from tqdm import tqdm
 from sklearn import svm, metrics
 from collections import Counter
 
+DIC_PATH = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\class_dictionary.csv'
 MODEL_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA'
 DATA_DIR = 'C:\\Users\\mathe\\Desktop\\TCC_IAA\\deep_features'
 TRAIN_DIR = os.path.join(DATA_DIR, 'train')
@@ -18,8 +19,15 @@ VALID_DIR = os.path.join(DATA_DIR, 'validation')
 
 clf = None
 
+df_dict = pd.read_csv(DIC_PATH, header=0, sep=";")
+class_names_all = df_dict.groupby('class_all_id').first()['class_all_descr'].to_frame().reset_index(level=0)\
+    .set_axis(['class_id', 'class_descr'], axis=1)
+class_names_grp = df_dict.groupby('class_group_id').first()['class_group_descr'].to_frame().reset_index(level=0)\
+    .set_axis(['class_id', 'class_descr'], axis=1)
 
-def print_confusion_matrix(confusion_matrix, class_names, figsize=(10, 7), fontsize=14):
+
+def print_confusion_matrix(confusion_matrix, df_classes, figsize=(10, 7), fontsize=14):
+    class_names = class_names_grp['class_descr'].unique()
     df_cm = pd.DataFrame(
         confusion_matrix, index=class_names, columns=class_names,
     )
@@ -41,7 +49,7 @@ def print_confusion_matrix(confusion_matrix, class_names, figsize=(10, 7), fonts
     return fig
 
 
-def print_heatmap(y_test, y_pred, class_names):
+def print_heatmap(y_test, y_pred, df_classes):
     matrix = metrics.confusion_matrix(y_test, y_pred)
     row_sum = np.sum(matrix, axis=1)
     w, h = matrix.shape
@@ -53,7 +61,7 @@ def print_heatmap(y_test, y_pred, class_names):
 
     c = c_m.astype(dtype=np.uint8)
 
-    heatmap = print_confusion_matrix(c, class_names, figsize=(18, 10), fontsize=20)
+    heatmap = print_confusion_matrix(c, df_classes, figsize=(18, 10), fontsize=20)
 
 
 def evaluate_classifier(y_test, y_pred):
@@ -70,7 +78,7 @@ def evaluate_classifier(y_test, y_pred):
     print('F1 score: %f' % f1)
 
 
-def plot_class_chart_bar(train_vals, test_vals, class_names):
+def plot_class_chart_bar(train_vals, test_vals, df_classes):
     width = 0.25
     n = len(train_vals)
     x = np.arange(n)
@@ -78,7 +86,7 @@ def plot_class_chart_bar(train_vals, test_vals, class_names):
     fig = plt.figure()
     ay = fig.add_subplot(211)
 
-    plt.xticks(x, class_names, rotation=45)
+    plt.xticks(x, df_classes['class_descr'].unique(), rotation=45)
 
     ay.bar(x + 0.00, train_vals, width, color="b")
     ay.bar(x + 0.25, test_vals, width, color="g")
@@ -90,25 +98,25 @@ def plot_class_chart_bar(train_vals, test_vals, class_names):
     fig.savefig(os.path.join(MODEL_DIR, 'classes.png'))
 
 
-def print_base_info(y_train, y_test, class_names):
+def print_base_info(y_train, y_test, df_classes):
     count_test = Counter(y_test)
     count_train = Counter(y_train)
     train_vals = []
     test_vals = []
 
     print('\nClasse | Treinamento | Teste')
-    for class_num, class_name in enumerate(class_names):
-        train_vals.append(count_train[class_num])
-        test_vals.append(count_test[class_num])
-        print(class_name + ' | %d | %d' % (count_train[class_num], count_test[class_num]))
+    for index, row in df_classes.iterrows():
+        train_vals.append(count_train[row['class_id']])
+        test_vals.append(count_test[row['class_id']])
+        print(row['class_descr'] + ' | %d | %d' % (count_train[row['class_id']], count_test[row['class_id']]))
 
-    plot_class_chart_bar(train_vals, test_vals, class_names)
+    plot_class_chart_bar(train_vals, test_vals, df_classes)
 
 
-def generate_svm_classifier():
+def generate_svm_classifier(label_file, df_classes):
     print('Carregando base de treino')
     x_train = pd.read_csv(os.path.join(TRAIN_DIR, 'features.csv'), header=None).to_numpy()
-    y_train = np.ravel(pd.read_csv(os.path.join(TRAIN_DIR, 'labels.csv'), header=None).to_numpy())
+    y_train = np.ravel(pd.read_csv(os.path.join(TRAIN_DIR, label_file + '.csv'), header=None).to_numpy())
 
     print('Iniciando treinamento')
     svc = svm.SVC(kernel='linear', verbose=True)
@@ -116,19 +124,22 @@ def generate_svm_classifier():
     del x_train
     gc.collect()
 
+    f = open(os.path.join(MODEL_DIR, 'clf_' + label_file + '.pkl'), 'wb')
+    pickle.dump(clf, f)
+    f.close()
+
     print('Carregando base de teste')
     x_test = pd.read_csv(os.path.join(TEST_DIR, 'features.csv'), header=None).to_numpy()
-    y_test = np.ravel(pd.read_csv(os.path.join(TEST_DIR, 'labels.csv'), header=None).to_numpy())
+    y_test = np.ravel(pd.read_csv(os.path.join(TEST_DIR, label_file + '.csv'), header=None).to_numpy())
 
-    class_names = np.ravel(pd.read_csv(os.path.join(TEST_DIR, 'class_names.csv'), header=None).to_numpy())
-    print_base_info(y_train, y_test, class_names)
+    print_base_info(y_train, y_test, df_classes)
 
     print('\nTreinamento: %d' % len(y_train))
     print('Teste: %d' % len(y_test))
 
     y_pred = svc.predict(x_test)
     evaluate_classifier(y_test, y_pred)
-    print_heatmap(y_test, y_pred, class_names)
+    print_heatmap(y_test, y_pred, df_classes)
 
     return svc
 
@@ -137,28 +148,27 @@ def determine_pred_class(y):
     return np.bincount(y).argmax()
 
 
-def predict_validation_videos(clf_model):
-    y_valid = []
-    y_pred = []
+# def predict_validation_videos(clf_model):
+#     y_valid = []
+#     y_pred = []
+#
+#     class_names = os.listdir(VALID_DIR)
+#     for class_num, class_name in enumerate(class_names):
+#         file_names = os.listdir(os.path.join(VALID_DIR, class_name))
+#         for file in tqdm(file_names):
+#             x_data = pd.read_csv(os.path.join(VALID_DIR, class_name, file), header=None).to_numpy()
+#             y_frames_pred = clf_model.predict(x_data)
+#             y_valid.append(class_num)
+#             y_pred.append(determine_pred_class(y_frames_pred))
+#
+#     print("Accuracy: ", metrics.accuracy_score(y_valid, y_pred))
 
-    class_names = os.listdir(VALID_DIR)
-    for class_num, class_name in enumerate(class_names):
-        file_names = os.listdir(os.path.join(VALID_DIR, class_name))
-        for file in tqdm(file_names):
-            x_data = pd.read_csv(os.path.join(VALID_DIR, class_name, file), header=None).to_numpy()
-            y_frames_pred = clf_model.predict(x_data)
-            y_valid.append(class_num)
-            y_pred.append(determine_pred_class(y_frames_pred))
 
-    print("Accuracy: ", metrics.accuracy_score(y_valid, y_pred))
+# if os.path.exists(os.path.join(MODEL_DIR, 'clf.pkl')):
+#     f = open(os.path.join(MODEL_DIR, 'clf.pkl'), 'rb')
+#     clf = pickle.load(f)
+# else:
+#     clf = generate_svm_classifier('labels_all')
+#
 
-
-if os.path.exists(os.path.join(MODEL_DIR, 'clf.pkl')):
-    f = open(os.path.join(MODEL_DIR, 'clf.pkl'), 'rb')
-    clf = pickle.load(f)
-else:
-    clf = generate_svm_classifier()
-    f = open(os.path.join(MODEL_DIR, 'clf.pkl'), 'wb')
-    pickle.dump(clf, f)
-
-predict_validation_videos(clf)
+# predict_validation_videos(clf)

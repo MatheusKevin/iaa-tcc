@@ -15,6 +15,7 @@ treino = [1, 10]
 teste = [11, 12]
 validacao = [13, 15]
 
+
 def obter_parte(part_id):
     if treino[0] <= part_id <= treino[1]:
         return 'train'
@@ -44,7 +45,8 @@ def get_full_length_annotations_per_video(video_name, anotations) -> list:
                       temp['frame_end'].iat[-1], annotation_id, temp['participant_id'].iat[0]))
     return lista
 
-anotations = pd.read_csv(FILE, sep=";")
+
+anotations = pd.read_csv(FILE, sep=",")
 
 for video in tqdm(anotations['file_id'].unique()):
 
